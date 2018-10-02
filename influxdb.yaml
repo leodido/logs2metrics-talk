@@ -1,0 +1,76 @@
+---
+# Section: influxdb service
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: logging
+  name: influxdb
+  labels:
+    component: influxdb
+    app: influxdb
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+spec:
+  clusterIP: None
+  ports:
+  - port: 8086
+    name: server
+  selector:
+    component: influxdb
+---
+# Section: influxdb statefulset
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  namespace: logging
+  name: influxdb
+  labels:
+    component: influxdb
+    app: influxdb
+spec:
+  serviceName: influxdb
+  selector:
+    matchLabels:
+      component: influxdb
+  replicas: 1
+  template:
+    metadata:
+      name: influxdb
+      labels:
+        component: influxdb
+        app: influxdb
+    spec:
+      containers:
+      - name: influxdb
+        image: quay.io/influxdb/influxdb:nightly
+        imagePullPolicy: Always
+        resources:
+          limits:
+            memory: 2G
+          requests:
+            memory: 1G
+        env:
+          - name: INFLUXDB_IFQL_ENABLED
+            value: "true"
+          - name: INFLUXDB_LOGGING_LEVEL
+            value: "error"
+          - name: INFLUXDB_HTTP_LOG_ENABLED
+            value: "false"
+        volumeMounts:
+          - name: data
+            mountPath: /var/lib/influxdb
+        ports:
+          - containerPort: 8086
+            name: server
+          - containerPort: 8082
+            name: ifql
+  volumeClaimTemplates:
+  - metadata:
+      namespace: logging
+      name: data
+    spec:
+      accessModes:
+        - "ReadWriteOnce"
+      resources:
+        requests:
+          storage: 2Gi

@@ -1,0 +1,284 @@
+---
+# Section: telegraf config map
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: telegraf
+  namespace: logging
+  labels:
+    component: telegraf
+    app: telegraf
+data:
+  telegraf.conf: |+
+    [global_tags]
+      env = "logging"
+    [agent]
+      interval = "10s"
+      round_interval = true
+      metric_batch_size = 1000
+      metric_buffer_limit = 10000
+      collection_jitter = "0s"
+      flush_interval = "10s"
+      flush_jitter = "0s"
+      precision = ""
+      debug = false
+      quiet = false
+      logfile = ""
+      omit_hostname = true
+    [[outputs.influxdb]]
+      urls = ["http://influxdb:8086"] # required
+      database = "telegraf" # required
+      retention_policy = "autogen"
+      write_consistency = "any"
+      timeout = "1m"
+    [[inputs.syslog]]
+      server = "tcp://:6514"
+      best_effort = true
+---
+# Section: rsyslog config map
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rsyslog
+  namespace: logging
+  labels:
+    component: rsyslog
+    app: rsyslog
+data:
+  rsyslog.conf: |+
+    # This only works with the following docker logging drivers currently: journald, json-file, and CRI-O log files
+    global(processInternalMessages="on")
+    global(parser.permitSlashInProgramName="on")
+    global(workDirectory="/var/spool/rsyslog") # default location for work (spool) files
+
+    # Raise limits within /etc/systemd/journald.conf on the host(s) - ie., RateLimitIntervalSec=30s + RateLimitBurst=1000000
+    module(load="imjournal" ignorepreviousmessages="on" ratelimit.interval="60" ratelimit.burst="2000000" persiststateinterval="10000" statefile="/var/spool/rsyslog/imjournal.state")
+
+    module(load="mmutf8fix")
+    module(load="mmkubernetes"
+      tls.cacert="/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+      tokenfile="/run/secrets/kubernetes.io/serviceaccount/token"
+      annotation_match=["."])
+
+    # Extracts k8s metadata
+    action(type="mmkubernetes")
+
+    # Compose k8s namespace and pod name into an app-name only when they are available
+    template(name="k8s_app" type="list") {
+      property(name="!kubernetes!namespace_name")
+      constant(value="/")
+      property(name="!kubernetes!pod_name")
+    }
+    set $!custom_appname = exec_template("k8s_app");
+    # Otherwise use the default app-name for journal entries not regarding k8s
+    template(name="appname" type="list") {
+      property(name="APP-NAME")
+    }
+    if $!custom_appname == "/" then {
+      set $!custom_appname = exec_template("appname");
+    }
+    if $!custom_appname startswith "rsyslogd-" then {
+      set $!custom_appname = "rsyslogd";
+    }
+
+    # Use the hostname for journal entries not regarding k8s
+    template(name="hostname" type="list") {
+      property(name="!_HOSTNAME")
+    }
+    set $!custom_hostname = exec_template("hostname");
+    # When empty it's because message does not come from journald but directly from rsyslogd
+    if $!custom_hostname == "" then {
+      set $!custom_hostname = "FROM-RSYSLOGD";
+    }
+
+    # Create structured data containing k8s metadata
+    template(name="k8s_cid" type="list") {
+      property(name="!docker!container_id" position.from="1" position.to="12")
+    }
+    set $!custom_cid = exec_template("k8s_cid");
+    template(name="k8s_nid" type="list") {
+      property(name="!kubernetes!namespace_id" position.from="1" position.to="12")
+    }
+    set $!custom_nid = exec_template("k8s_nid");
+    template(name="k8s_pid" type="list") {
+      property(name="!kubernetes!pod_id" position.from="1" position.to="12")
+    }
+    set $!custom_pid = exec_template("k8s_pid");
+
+    template(name="k8s_component" type="list") {
+      property(name="!kubernetes!labels!component" position.from="1" position.to="32")
+    }
+    set $!custom_component = exec_template("k8s_component");
+    template(name="k8s_crevision" type="list") {
+      property(name="!kubernetes!labels!controller-revision-hash" position.from="1" position.to="32")
+    }
+    set $!custom_crevision = exec_template("k8s_crevision");
+
+    set $!custom_ids = "";
+    if $!custom_cid != "" then {
+      set $!custom_ids = 'container="' & $!custom_cid & '"';
+    }
+    if $!custom_nid != "" then {
+      set $!custom_ids = $!custom_ids & ' namespace="' & $!custom_nid & '"';
+    }
+    if $!custom_pid != "" then {
+      set $!custom_ids = $!custom_ids & ' pod="' & $!custom_pid & '"';
+    }
+    if $!custom_ids != "" then {
+      set $!custom_ids = "[id " & $!custom_ids & "]";
+    }
+
+    set $!custom_labels = "";
+    if $!custom_component != "" then {
+      set $!custom_labels = 'component="' & $!custom_component & '"';
+    }
+    if $!custom_crevision != "" then {
+      set $!custom_labels = $!custom_labels & ' controller-revision-hash="' & $!custom_crevision & '"';
+    }
+    if $!custom_labels != "" then {
+      set $!custom_labels = "[label " & $!custom_labels & "]";
+    }
+
+    template(name="c_sddata" type="list") {
+      property(name="!custom_ids" compressspace="on")
+      property(name="!custom_labels" compressspace="on")
+    }
+    template(name="sddata" type="list") {
+      property(name="STRUCTURED-DATA")
+    }
+    if $!custom_labels == "" and $!custom_ids == "" then {
+      set $!custom_sddata = exec_template("sddata");
+    } else {
+      set $!custom_sddata = exec_template("c_sddata");
+    }
+
+    # Compose RFC5424 message
+    template(name="rfc5424" type="list") {
+      constant(value="<")
+      property(name="PRI")
+      constant(value=">1 ")
+      property(name="TIMESTAMP" dateFormat="rfc3339" date.inUTC="on")
+      constant(value=" ")
+      property(name="!custom_hostname" position.from="1" position.to="255" caseConversion="lower")
+      constant(value=" ")
+      property(name="!custom_appname" position.from="1" position.to="48" caseConversion="lower")
+      constant(value=" ")
+      property(name="PROCID" position.from="1" position.to="128")
+      constant(value=" ")
+      property(name="MSGID" position.from="1" position.to="32")
+      constant(value=" ")
+      property(name="!custom_sddata")
+      constant(value=" ")
+      property(name="msg" droplastlf="on")
+      constant(value="\n")
+    }
+
+    action(type="mmutf8fix")
+
+    action(type="omfwd"
+      target="127.0.0.1"
+      port="6514"
+      protocol="tcp"
+      tcp_framing="octet-counted"
+      template="rfc5424"
+      queue.type="LinkedList"
+      queue.size="5000000"
+      queue.filename="forwarding"
+      queue.maxdiskspace="1g")
+
+    # Uncomment do enable debug
+    # action(type="omfile" file="/var/log/debuglog" template="RSYSLOG_DebugFormat")
+    # action(type="omfile" file="/var/log/rfc_5424" template="rfc5424")
+---
+# Section: telegraf + rsyslog daemon set
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: telegraf
+  namespace: logging
+  labels:
+    app: telegraf
+    component: telegraf
+spec:
+  selector:
+    matchLabels:
+      name: telegraf
+  template:
+    metadata:
+      labels:
+        name: telegraf
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      containers:
+      - name: telegraf
+        image: docker.io/telegraf:1.8.0-alpine
+        resources:
+          limits:
+            memory: 500Mi
+          requests:
+            cpu: 500m
+            memory: 500Mi
+        env:
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        ports:
+          - containerPort: 6514
+            name: receiver
+        volumeMounts:
+        - name: docker-socket
+          mountPath: /var/run/docker.sock
+        - name: telegraf-config
+          mountPath: /etc/telegraf
+      - name: rsyslog
+        image: quay.io/leodido/rsyslog:latest
+        command: ["bash"]
+        args: ["-c", "rsyslogd -n -f /etc/rsyslog/rsyslog.conf >/dev/null 2>&1"]
+        volumeMounts:
+        - name: journal-var
+          mountPath: /var/log/journal
+          readOnly: true
+        - name: journal-run
+          mountPath: /run/log/journal
+          readOnly: true
+        - name: journal-sys
+          mountPath: /run/systemd/journal
+          readOnly: true
+        - name: machine-id
+          mountPath: /etc/machine-id
+          readOnly: true
+        - name: rsyslog-config
+          mountPath: /etc/rsyslog
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - hostPath:
+          path: /var/run/docker.sock
+          type: ""
+        name: docker-socket
+      - hostPath:
+          path: /var/log/journal
+          type: ""
+        name: journal-var
+      - hostPath:
+          path: /run/log/journal
+          type: ""
+        name: journal-run
+      - hostPath:
+          path: /run/systemd/journal
+          type: ""
+        name: journal-sys
+      - hostPath:
+          path: /etc/machine-id
+          type: ""
+        name: machine-id
+      - configMap:
+          defaultMode: 420
+          name: telegraf
+        name: telegraf-config
+      - configMap:
+          defaultMode: 420
+          name: rsyslog
+        name: rsyslog-config
