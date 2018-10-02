@@ -13,6 +13,10 @@ The stack used to achieve this is:
 - InfluxDB
 - [Kapacitor](https://github.com/influxdata/kapacitor)
 
+![Chronograf Log Viewer](images/logviewer-chronograf.png "Chronograf Log Viewer")
+
+![Exploring RFC5425 syslog messages with Chronograf](images/exploring-syslog-chronograf.png "Exploring RFC5425 syslog messages with Chronograf")
+
 ## Setup
 
 First of all we need a local k8s environment.
