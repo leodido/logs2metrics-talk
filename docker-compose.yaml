@@ -1,0 +1,12 @@
+version: "3.0"
+services:
+  kapacitor:
+    network_mode: host
+    image: kapacitor:1.5
+    volumes:
+      - ./kapacitor:/opt/kapacitor
+      - ./kapacitor/kapacitor.conf:/etc/kapacitor/kapacitor.conf
+      - /tmp/example.sock:/tmp/example.sock
+    environment:
+      - KAPACITOR_LOAD_ENABLED=true
+      - KAPACITOR_LOAD_DIR=/opt/kapacitor

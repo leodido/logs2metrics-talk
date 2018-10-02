@@ -1,0 +1,11 @@
+dbrp "telegraf"."autogen"
+
+stream
+    |from()
+        .measurement('syslog')
+        .truncate(1ms)
+        .where(lambda: "appname" == 'kubelet')
+    @example()
+    |influxDBOut()
+        .database('telegraf')
+        .measurement('k8s')
