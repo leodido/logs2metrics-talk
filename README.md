@@ -32,7 +32,12 @@ Note that we need the journald log driver for the inner docker since the rsyslog
 The following step is to become a YAML developer :hear_no_evil: :speak_no_evil:, applying all the YAML files describing our setup.
 
 ```bash
-kubectl apply -f ...
+kubectl apply -f namespace.yaml
+kubectl apply -f roles.yaml
+kubectl apply -f influxdb.yaml
+kubectl apply -f telelog.yaml
+kubectl apply -f chronograf.yaml
+kubectl apply -f kapacitor.yaml
 ```
 
 Finally to access Chronograf from within our local browser we need the following port forward.
