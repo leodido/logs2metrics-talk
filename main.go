@@ -5,7 +5,6 @@ import (
 	"encoding/gob"
 	"errors"
 	"flag"
-	"fmt"
 	"net"
 	"os"
 	"regexp"
@@ -111,7 +110,7 @@ func mapSubexpNames(m, n []string) map[string]string {
 	return r
 }
 
-// Receive a point and compute the average.
+// Receive a point and do something with it.
 // Send a response with the average value.
 func (h *handler) Point(p *agent.Point) error {
 	var r = regexp.MustCompile(`(?m).*Kill process (?P<pid>\d+) (?P<proc>\(.*\)) score (?P<score>\d+)`)
@@ -119,8 +118,6 @@ func (h *handler) Point(p *agent.Point) error {
 	if ok {
 		m := r.FindStringSubmatch(message)
 		data := mapSubexpNames(m, r.SubexpNames())
-
-		fmt.Println(data)
 
 		proc := strings.Trim(data["proc"], "()")
 		state := h.state[proc]

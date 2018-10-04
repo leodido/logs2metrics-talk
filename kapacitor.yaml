@@ -111,9 +111,9 @@ spec:
             value: "http://influxdb.logging.svc:8086"
         resources:
           limits:
-            memory: 1G
-          requests:
             memory: 500M
+          requests:
+            memory: 250M
         volumeMounts:
         - name: shared-socket
           mountPath: /var/run
