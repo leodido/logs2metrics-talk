@@ -1,0 +1,146 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kapacitor-task
+  namespace: logging
+data:
+  example.tick: |+
+    dbrp "telegraf"."autogen"
+    stream
+      |from()
+        .measurement('syslog')
+        .truncate(1ms)
+        .where(lambda: "appname" == 'kernel')
+        .where(lambda: "message" =~ /sacrifice/)
+      @example()
+      |influxDBOut()
+        .database('telegraf')
+        .measurement('k8s')
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kapacitor-config
+  namespace: logging
+data:
+  kapacitor.conf: |+
+      data_dir = "/var/lib/kapacitor"
+      [replay]
+        dir = "/var/lib/kapacitor/replay"
+      [storage]
+        boltdb = "/var/lib/kapacitor/kapacitor.db"
+      [load]
+        enabled = true
+        dir = "/opt/kapacitor"
+      [udf]
+      [udf.functions]
+        [udf.functions.example]
+          socket = "/var/run/example.sock"
+          timeout = "10s"
+      [logging]
+        file = "STDOUT"
+        level = "ERROR"
+      [[influxdb]]
+        enabled = true
+        default = true
+        name = "logging"
+        urls = ["http://localhost:8086"]
+        timeout = 0
+        startup-timeout = "5m"
+        [influxdb.subscriptions]
+          telegraf = ["autogen"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kapacitor-example
+  namespace: logging
+  labels:
+    app: kapacitor-example
+    component: kapacitor-example
+spec:
+  selector:
+    component: kapacitor-example
+  ports:
+    - name: backend
+      port: 9092
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kapacitor-example
+  namespace: logging
+  labels:
+    app: kapacitor-example
+  annotations:
+    kubernetes.io/hostname: kapacitor-example.logging.svc
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      component: kapacitor-example
+  template:
+    metadata:
+      labels:
+        app: kapacitor-example
+        component: kapacitor-example
+    spec:
+      volumes:
+      - name: shared-socket
+        emptyDir: {}
+      - name: kapacitor-task
+        configMap:
+          name: kapacitor-task
+      - name: kapacitor-config
+        configMap:
+          name: kapacitor-config
+      - name: kapacitor-volclaim
+        persistentVolumeClaim:
+          claimName: kapacitor-volclaim
+      containers:
+      - name: kapacitor
+        image: docker.io/kapacitor:1.5
+        env:
+          - name: "KAPACITOR_HOSTNAME"
+            value: "kapacitor-example.logging.svc"
+          - name: "KAPACITOR_INFLUXDB_0_URLS_0"
+            value: "http://influxdb.logging.svc:8086"
+        resources:
+          limits:
+            memory: 1G
+          requests:
+            memory: 500M
+        volumeMounts:
+        - name: shared-socket
+          mountPath: /var/run
+        - name: kapacitor-config
+          mountPath: /etc/kapacitor
+        - name: kapacitor-task
+          mountPath: /opt/kapacitor/tasks
+        - name: kapacitor-volclaim
+          mountPath: /var/lib/kapacitor
+        ports:
+        - containerPort: 9092
+      - name: example-udf
+        imagePullPolicy: Always
+        image: quay.io/leodido/example-udf:latest
+        args: ["-socket", "/var/run/example.sock"]
+        volumeMounts:
+        - name: shared-socket
+          mountPath: /var/run
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: kapacitor-volclaim
+  namespace: logging
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
