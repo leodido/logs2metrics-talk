@@ -38,15 +38,8 @@ Note that we need the journald log driver for the inner docker since the rsyslog
 
 The following step is to become a YAML developer :hear_no_evil: :speak_no_evil:, applying all the YAML files describing our setup.
 
-<div style="display: flex; align-items: center;">
-<div style="flex: 33.33%; padding: 4px;">
-<img alt="YAML meme" src="images/yaml-dev.jpg">
-</div>
-<div style="flex: 33.33%; padding: 4px;">
-<img alt="The life of a YAML developer" src="images/yaml-dev-life.jpg">
-</div>
-</div>
-
+| ![YAML meme](images/yaml-dev.jpg) | ![The life of a YAML developer](images/yaml-dev-life.jpg) |
+|:---:|:---:|
 
 And execute the following commands.
 
