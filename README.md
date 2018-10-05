@@ -1,4 +1,6 @@
-# Talk: From logs to metric
+# Talk: From logs to metric with the TICK stack
+
+[**Slides**](http://bit.ly/from-logs-to-metrics-tick).
 
 This repository contains the PoC associated with the talk "From logs to metric with the TICK stack".
 
