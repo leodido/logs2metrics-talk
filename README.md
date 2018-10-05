@@ -1,10 +1,10 @@
 # Talk: From logs to metric
 
-This repository contains the PoC associated with the talk "From logs to metric".
+This repository contains the PoC associated with the talk "From logs to metric with the TICK stack".
 
 Its main goal is to show how to extract (structured) value from the huge amount of (unstructured) information that logs contain.
 
-In brief, the steps are as follows: parsing of syslog messages into structured data, ingesting/collecting them via Telegraf syslog input plugin, visualizing and plot them via Chronograf's log viewer, and eliciting new meaningful metrics to plot processing them via Kapacitor.
+In brief, the steps are as follows: parsing of syslog messages into structured data, ingesting/collecting them via Telegraf syslog input plugin, visualizing and plot them via Chronograf's log viewer, and eliciting new meaningful metrics (eg. number of process OOM killed) to plot processing them via a Kapacitor [UDF](https://docs.influxdata.com/kapacitor/v1.5/guides/socket_udf/).
 
 The stack used to achieve this is:
 
@@ -16,6 +16,11 @@ The stack used to achieve this is:
 ![Chronograf Log Viewer](images/logviewer-chronograf.png "Chronograf Log Viewer")
 
 ![Exploring RFC5425 syslog messages with Chronograf](images/exploring-syslog-chronograf.png "Exploring RFC5425 syslog messages with Chronograf")
+
+![Couting OOMs](images/ooms-num.png "Couting OOMs")
+
+![Counting OOMs of stress pod](images/ooms-stress.png "Counting OOMs of stress pod")
+
 
 ## Setup
 
@@ -38,6 +43,7 @@ kubectl apply -f influxdb.yaml
 kubectl apply -f telelog.yaml
 kubectl apply -f chronograf.yaml
 kubectl apply -f kapacitor.yaml
+kubectl apply -f stress.yaml
 ```
 
 Finally to access Chronograf from within our local browser we need the following port forward.
