@@ -23,7 +23,6 @@ The stack used to achieve this is:
 
 ![Counting OOMs of stress pod](images/ooms-stress.png "Counting OOMs of stress pod")
 
-
 ## Setup
 
 First of all we need a local k8s environment.
@@ -34,14 +33,14 @@ Let's proceed with minikube.
 minikube start --docker-opt log-driver=journald
 ```
 
-Note that we need the journald log driver for the inner docker since the rsyslog's mmkubernetes module [only works with it](https://www.rsyslog.com/doc/master/configuration/modules/mmkubernetes.html) (or with json-file docker log driver).
+Note that we need the **journald log driver** for the inner docker since the rsyslog's mmkubernetes module [only works with it](https://www.rsyslog.com/doc/master/configuration/modules/mmkubernetes.html) (or with **json-file docker log driver**).
 
 The following step is to become a YAML developer :hear_no_evil: :speak_no_evil:, applying all the YAML files describing our setup.
 
 | ![YAML meme](images/yaml-dev.jpg) | ![The life of a YAML developer](images/yaml-dev-life.jpg) |
 |:---:|:---:|
 
-And execute the following commands.
+Assuming your minikube setup is capable of provisioning volumes, execute the following commands.
 
 ```bash
 kubectl apply -f namespace.yaml
@@ -61,6 +60,10 @@ kubectl port-forward svc/chronograf -n logging 8888:80
 
 Go to [localhost:8888](http://localhost:8888) now!
 
+## Run with local up cluster
+
+_TBD_.
+
 ## Developing the Kapacitor UDF
 
 File `docker-compose.yaml` is useful during the development and debugging of the Kapacitor UDF.
@@ -76,6 +79,21 @@ Then run
 ```bash
 docker-compose up -d
 ```
+
+## Other suitable docker log drivers
+
+It is possible to use this with **[syslog docker log driver](https://docs.docker.com/config/containers/logging/syslog/#options)** with following log options:
+
+- `syslog-format=rfc5424micro`
+- `syslog-address=udp://1.2.3.4:1111` (telegraf syslog plugin)
+
+In such case:
+
+- there is not need for rsyslog
+- telegraf syslog plugin in UDF mode (at the moment in TCP/TLS mode there is not way to disable octet framing requirement - ie., RFC5425)
+- syslog facility will be fixed (depending on the `syslog-facility` option)
+
+_TBD_: create an alternative setup for this setup.
 
 ---
 
