@@ -69,6 +69,7 @@ spec:
       namespace: logging
       name: data
     spec:
+      # storageClassName: "dynamic"
       accessModes:
         - "ReadWriteOnce"
       resources:

@@ -128,7 +128,7 @@ spec:
       - name: example-udf
         imagePullPolicy: Always
         image: quay.io/leodido/example-udf:latest
-        args: ["-socket", "/var/run/example.sock"]
+        args: ["--socket", "/var/run/example.sock"]
         volumeMounts:
         - name: shared-socket
           mountPath: /var/run
@@ -139,6 +139,7 @@ metadata:
   name: kapacitor-volclaim
   namespace: logging
 spec:
+  # storageClassName: "dynamic"
   accessModes:
     - ReadWriteOnce
   resources:

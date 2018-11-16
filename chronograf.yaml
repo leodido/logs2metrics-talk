@@ -68,6 +68,7 @@ metadata:
     app: chronograf
     component: chronograf
 spec:
+  # storageClassName: "dynamic"
   accessModes:
     - "ReadWriteOnce"
   resources:
