@@ -104,7 +104,7 @@ func (h *handler) Restore(req *agent.RestoreRequest) (*agent.RestoreResponse, er
 func mapSubexpNames(m, n []string) map[string]string {
 	m, n = m[1:], n[1:]
 	r := make(map[string]string, len(m))
-	for i, _ := range n {
+	for i := range n {
 		r[n[i]] = m[i]
 	}
 	return r
@@ -176,6 +176,7 @@ func (acc *accepter) Accept(conn net.Conn) {
 var socketPath = flag.String("socket", "/tmp/example.sock", "Where to create the unix socket.")
 
 func main() {
+	flag.Parse()
 	addr, err := net.ResolveUnixAddr("unix", *socketPath)
 	if err != nil {
 		log.Fatal(err)
